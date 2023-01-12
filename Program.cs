@@ -207,9 +207,18 @@ public class Program {
                     }
                     System.Console.Out.WriteLine(relativeName);
                     var content = await System.IO.File.ReadAllBytesAsync(inputPath + relativeName);
+                    
                     var fileContent = new FileContent(relativeName, Convert.ToBase64String(content));
-                    putFileContent.LstFileContent.Add(fileContent);
-                    size += content.Length;
+                    size += fileContent.ContentBase64.Length + relativeName.Length +256;
+                    if (size>262144){
+                        if (putFileContent.LstFileContent.Count==0){
+                            System.Console.WriteLine($"File is too big {relativeName}");
+                        } else {
+                            queueRelativeName.Enqueue(relativeName);
+                        }
+                    } else {
+                        putFileContent.LstFileContent.Add(fileContent);
+                    }
                     if (size > 10 * 1024) {
                         await transportService.Send(new TransportMessage(nameof(PutFileContent), "application/json", System.BinaryData.FromObjectAsJson(putFileContent)));
                         putFileContent = new(new());
