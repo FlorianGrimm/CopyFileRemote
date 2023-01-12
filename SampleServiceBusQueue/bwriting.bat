@@ -1,0 +1,1 @@
+dotnet run "%~dp0..\CopyFileRemote.csproj" --ServiceType ServiceBusQueue --HostMe A --HostOther B --OutputPath "%~dp0DataB"
