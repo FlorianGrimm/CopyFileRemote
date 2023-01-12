@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "CopyFileRemote": {
+      "commandName": "Project",
+      "commandLineArgs": " -- --OutputPath C:\\github.com\\FlorianGrimm\\t  --HostMe A --HostOther B --ServiceType ServiceBusQueue",
+      "hotReloadEnabled": false
+    }
+  }
+}

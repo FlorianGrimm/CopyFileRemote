@@ -249,6 +249,7 @@ public class Program {
         if (string.IsNullOrEmpty(outputPath)) {
             return -1;
         }
+        outputPath=System.IO.Path.GetFullPath(outputPath);
         if (!outputPath.EndsWith(System.IO.Path.DirectorySeparatorChar)) {
             outputPath = outputPath + System.IO.Path.DirectorySeparatorChar;
         }
@@ -289,16 +290,27 @@ public class Program {
 
             var listFileHashReceiver = await taskReadListFileHash;
             var dictFileHashReceiver = listFileHashReceiver.LstFileHash.ToDictionary(x => x.RelativeName, x => x);
+            System.Diagnostics.Debugger.Break();
+            System.Console.Out.WriteLine($"listFileHashReceiver:");
+            foreach(var x in listFileHashReceiver.LstFileHash){
+                System.Console.Out.WriteLine($"R:{x.RelativeName}");
+            }
 
             var getFileContent = new GetFileContent(new());
             foreach (var fileHash in listFileHashSender.LstFileHash) {
                 if (dictFileHashReceiver.TryGetValue(fileHash.RelativeName, out var fileHashReceiver)) {
                     if (fileHashReceiver.Hash == fileHash.Hash) {
                         continue;
+                    } else{
+                        System.Console.Out.WriteLine($"File '{fileHash.RelativeName}' is different in the receiver {fileHashReceiver.Hash} != {fileHash}.");
                     }
+                } else {
+                    System.Console.Out.WriteLine($"File '{fileHash.RelativeName}' is not found in the receiver.");
                 }
                 getFileContent.LstRelativeName.Add(fileHash.RelativeName);
             }
+
+            System.Console.ReadLine();
             await transportService.Send(new TransportMessage(nameof(GetFileContent), "application/json", System.BinaryData.FromObjectAsJson(getFileContent)));
 
             while (true) {
@@ -311,8 +323,8 @@ public class Program {
                     var putFileContent = msg.Body.ToObjectFromJson<PutFileContent>();
                     foreach (var fileContent in putFileContent.LstFileContent) {
                         var relativeName = fileContent.RelativeName;
-                        System.Console.Out.WriteLine(relativeName);
-                        var file = new FileInfo(outputPath + relativeName);
+                        System.Console.Out.WriteLine($"W: {relativeName}");
+                        var file = new FileInfo(System.IO.Path.Combine(outputPath, relativeName));
                         if (!file.Directory!.Exists) {
                             file.Directory.Create();
                         }
