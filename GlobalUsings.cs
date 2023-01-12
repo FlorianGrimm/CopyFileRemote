@@ -15,3 +15,6 @@ global using global::Azure.Core;
 global using global::Azure.Identity;
 global using global::Azure.Messaging.ServiceBus;
 global using global::Azure.Messaging.ServiceBus.Administration;
+
+//global using global::System.Windows.Forms;
+global using global::CopyFileRemote;

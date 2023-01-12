@@ -1,4 +1,5 @@
-﻿// rgdevl-flori-CopyFileRemote
+﻿namespace CopyFileRemote;
+
 public class Program {
     public static async Task<int> Main(string[] args) {
         var appSettings = GetAppSettings(args);
@@ -10,11 +11,13 @@ public class Program {
         //     System.Console.Error.WriteLine("HostType is not configured and cannot be determined.");
         //     return -1;
         // }
-        if (string.IsNullOrEmpty(appSettings.ServiceBusConnectionString)
-            && string.IsNullOrEmpty(appSettings.ServiceBusNamespace)
-        ) {
-            System.Console.Error.WriteLine("ServiceBusConnectionString nor ServiceBusNamespace is not configured.");
-            return -1;
+        if (appSettings.ServiceType == ServiceType.ServiceBusQueue) {
+            if (string.IsNullOrEmpty(appSettings.ServiceBusConnectionString)
+                && string.IsNullOrEmpty(appSettings.ServiceBusNamespace)
+            ) {
+                System.Console.Error.WriteLine("ServiceBusConnectionString nor ServiceBusNamespace is not configured.");
+                return -1;
+            }
         }
         var (r, transportService) = await SetupPipeline(appSettings);
         if (r != 0 || transportService is null) {
@@ -75,12 +78,21 @@ public class Program {
 
     private static async Task<(int result, ITransportService? transportService)> SetupPipeline(AppSettings appSettings) {
         System.Console.Out.WriteLine("Creating the Service Bus Administration Client object");
-        var adminClient = createServiceBusAdministrationClient(appSettings);
-        if (adminClient is null) {
-            System.Console.Error.WriteLine("ServiceBusNamespace or ServiceBusConnectionString is not configured.");
-            return (-1, null);
+
+        if (appSettings.ServiceType == ServiceType.Clipboard) {
+            var transportService = CreateTransportService(appSettings);
+            if (transportService is null) {
+                System.Console.Error.WriteLine($"Service type '{appSettings.ServiceType}' is not supported.");
+                return (-1, null);
+            }
+            return (0, transportService);
         }
         if (appSettings.ServiceType == ServiceType.ServiceBusQueue) {
+            var adminClient = createServiceBusAdministrationClient(appSettings);
+            if (adminClient is null) {
+                System.Console.Error.WriteLine("ServiceBusNamespace or ServiceBusConnectionString is not configured.");
+                return (-1, null);
+            }
             var transportService = (ServiceBusQueueTransportService?)CreateTransportService(appSettings);
             if (transportService is null) {
                 System.Console.Error.WriteLine($"Service type '{appSettings.ServiceType}' is not supported.");
@@ -90,6 +102,11 @@ public class Program {
             return (0, transportService);
         }
         if (appSettings.ServiceType == ServiceType.ServiceBusTopic) {
+            var adminClient = createServiceBusAdministrationClient(appSettings);
+            if (adminClient is null) {
+                System.Console.Error.WriteLine("ServiceBusNamespace or ServiceBusConnectionString is not configured.");
+                return (-1, null);
+            }
             // not ready yet
             var topicName = appSettings.GetServiceBusTopic();
             System.Console.Out.WriteLine($"Creating the topic {topicName}");
@@ -154,7 +171,7 @@ public class Program {
 
             // var json = System.Text.Json.JsonSerializer.Serialize(listFileHashSender);
 
-            await transportService.Send(new Message("ListFileHash", "application/json", System.BinaryData.FromObjectAsJson(listFileHashSender)));
+            await transportService.Send(new TransportMessage("ListFileHash", "application/json", System.BinaryData.FromObjectAsJson(listFileHashSender)));
 
             while (true) {
                 GetFileContent? getFileContent = null;
@@ -195,7 +212,7 @@ public class Program {
                     putFileContent.LstFileContent.Add(fileContent);
                     size += content.Length;
                     if (size > 10 * 1024) {
-                        await transportService.Send(new Message("PutFileContent", "application/json", System.BinaryData.FromObjectAsJson(putFileContent)));
+                        await transportService.Send(new TransportMessage("PutFileContent", "application/json", System.BinaryData.FromObjectAsJson(putFileContent)));
                         putFileContent = new(new());
                         size = 0;
                         await Task.Delay(TimeSpan.FromMilliseconds(10));
@@ -222,15 +239,14 @@ public class Program {
                     }
                 }
                 if (putFileContent.LstFileContent.Count > 0) {
-                    await transportService.Send(new Message("PutFileContent", "application/json", System.BinaryData.FromObjectAsJson(putFileContent)));
+                    await transportService.Send(new TransportMessage("PutFileContent", "application/json", System.BinaryData.FromObjectAsJson(putFileContent)));
                 }
-                await transportService.Send(new Message("More?", "application/json", System.BinaryData.FromString("More?")));
+                await transportService.Send(new TransportMessage("More?", "application/json", System.BinaryData.FromString("More?")));
             }
         } finally {
-            await transportService.Send(new Message("Goodbye", "application/json", System.BinaryData.FromString("Goodbye")));
+            await transportService.Send(new TransportMessage("Goodbye", "application/json", System.BinaryData.FromString("Goodbye")));
             while ((await transportService.Receive(TimeSpan.FromSeconds(2))) is not null) { }
         }
-        return 0;
     }
 
     private static async Task<int> LocalWriteToFS(AppSettings appSettings, ITransportService transportService) {
@@ -288,7 +304,7 @@ public class Program {
                 }
                 getFileContent.LstRelativeName.Add(fileHash.RelativeName);
             }
-            await transportService.Send(new Message("GetFileContent", "application/json", System.BinaryData.FromObjectAsJson(getFileContent)));
+            await transportService.Send(new TransportMessage("GetFileContent", "application/json", System.BinaryData.FromObjectAsJson(getFileContent)));
 
             while (true) {
                 var msg = await transportService.Receive();
@@ -311,21 +327,21 @@ public class Program {
                             await System.IO.File.WriteAllBytesAsync(file.FullName, Convert.FromBase64String(fileContent.ContentBase64));
                         }
                     }
-                    await transportService.Send(new Message("Continue", "application/json", System.BinaryData.FromString("Continue")));
+                    await transportService.Send(new TransportMessage("Continue", "application/json", System.BinaryData.FromString("Continue")));
                     continue;
                 }
 
                 if (msg.Subject == "Goodbye") {
                     break;
                 }
-                
+
 
                 if (msg.Subject == "More?") {
                     break;
                 }
             }
         } finally {
-            await transportService.Send(new Message("Goodbye", "application/json", System.BinaryData.FromString("Goodbye")));
+            await transportService.Send(new TransportMessage("Goodbye", "application/json", System.BinaryData.FromString("Goodbye")));
             while ((await transportService.Receive(TimeSpan.FromSeconds(2))) is not null) { }
         }
 
@@ -419,6 +435,12 @@ public class Program {
     }
 
     private static ITransportService? CreateTransportService(AppSettings appSettings) {
+        if (appSettings.ServiceType == ServiceType.Clipboard) {
+            return new ClipboardTransportService(
+                appSettings.GetServiceBusQueueMeOther(),
+                appSettings.GetServiceBusQueueOtherMe()
+                );
+        } else
         if (appSettings.ServiceType == ServiceType.ServiceBusQueue) {
             if (!string.IsNullOrEmpty(appSettings.ServiceBusNamespace)) {
                 var tokenCredential = GetTokenCredential(appSettings);
@@ -478,333 +500,7 @@ public enum HostType {
 
 public enum ServiceType {
     Unknown,
+    Clipboard,
     ServiceBusQueue,
     ServiceBusTopic,
-}
-
-public class AppSettings {
-    public ServiceType ServiceType { get; set; } = ServiceType.Unknown;
-    public HostType HostType { get; set; } = HostType.Unknown;
-    public string? HostMe { get; set; }
-    public string? HostOther { get; set; }
-    public string? Json { get; set; }
-    public string? InputPath { get; set; }
-    public string[] IncludeExtensions { get; set; } = new[] { ".sln", ".cs", ".csproj", ".ts", ".tsx", ".txt" };
-    public string[] ExcludeDirectory { get; set; } = new[] { "node_modules", "bower_components", "obj", "bin", "packages" };
-    public string? OutputPath { get; set; }
-    public bool RecurseSubdirectories { get; set; } = true;
-    public string? ServiceBusNamespace { get; set; }
-    public string? ServiceBusConnectionString { get; set; }
-    public string? ServiceBusQueueMeOther { get; set; }
-    public string? ServiceBusQueueOtherMe { get; set; }
-    public string GetServiceBusQueueMeOther() {
-        return ServiceBusQueueMeOther ?? $"Queue-{HostMe}-{HostOther}";
-    }
-    public string GetServiceBusQueueOtherMe() {
-        return ServiceBusQueueMeOther ?? $"Queue-{HostOther}-{HostMe}";
-    }
-
-    public string? ServiceBusTopic { get; set; }
-    public string GetServiceBusTopic() {
-        return ServiceBusTopic ?? $"{HostMe}-{HostOther}";
-    }
-
-    public ServiceBusClientOptions? ServiceBusClientOptions { get; set; }
-    public DefaultAzureCredentialOptions? DefaultAzureCredentialOptions { get; set; }
-    public ClientSecretOptions? ClientSecretOptions { get; set; }
-
-    public AppSettings() {
-        this.ServiceBusClientOptions = new ServiceBusClientOptions {
-            TransportType = ServiceBusTransportType.AmqpWebSockets
-        };
-        this.ClientSecretOptions = new ClientSecretOptions();
-        this.DefaultAzureCredentialOptions = new DefaultAzureCredentialOptions();
-    }
-}
-
-public class ClientSecretOptions {
-    /// <summary>
-    /// Gets the Azure Active Directory tenant (directory) Id of the service principal
-    /// </summary>
-    public string? TenantId { get; set; }
-
-    /// <summary>
-    /// Gets the client (application) ID of the service principal
-    /// </summary>
-    public string? ClientId { get; }
-
-    /// <summary>
-    /// Gets the client secret that was generated for the App Registration used to authenticate the client.
-    /// </summary>
-    public string? ClientSecret { get; set; }
-}
-public record Message(
-    string Subject,
-    string ContentType,
-    System.BinaryData Body
-);
-public interface ITransportService : IAsyncDisposable {
-    Task OpenForLocalReadFromFS();
-    Task OpenForLocalWriteToFS();
-
-    Task Ping();
-    Task WaitForPing();
-
-    Task Send(Message message);
-    Task<Message?> Receive(TimeSpan? timeout = default);
-
-    // Task<int> Setup(ServiceBusAdministrationClient adminClient);
-}
-public class ServiceBusQueueTransportService : ITransportService, IAsyncDisposable {
-    private readonly string _QueueNameMeOther;
-    private readonly string _QueueNameOtherMe;
-    private readonly string? _ServiceBusConnectionString;
-    private readonly string? _ServiceBusNamespace;
-    private readonly TokenCredential? _TokenCredential;
-    private readonly ServiceBusClientOptions? _ServiceBusClientOptions;
-    private ServiceBusClient? _Client;
-    private string _SenderQueueName = "";
-    private ServiceBusSender? _Sender;
-    private string _ReceiverQueueName = "";
-    private ServiceBusReceiver? _Receiver;
-
-    public ServiceBusQueueTransportService(string queueNameMeOther, string queueNameOtherMe, string serviceBusConnectionString, ServiceBusClientOptions? serviceBusClientOptions = null) {
-        if (string.IsNullOrEmpty(queueNameMeOther)) { throw new ArgumentNullException(nameof(queueNameMeOther)); }
-        if (string.IsNullOrEmpty(queueNameOtherMe)) { throw new ArgumentNullException(nameof(queueNameOtherMe)); }
-        if (string.IsNullOrEmpty(serviceBusConnectionString)) { throw new ArgumentNullException(nameof(serviceBusConnectionString)); }
-        this._QueueNameMeOther = queueNameMeOther;
-        this._QueueNameOtherMe = queueNameOtherMe;
-        this._ServiceBusConnectionString = serviceBusConnectionString;
-        this._ServiceBusClientOptions = serviceBusClientOptions;
-        this._ServiceBusNamespace = null;
-        this._TokenCredential = null;
-
-    }
-    public ServiceBusQueueTransportService(string queueNameMeOther, string queueNameOtherMe, string serviceBusNamespace, TokenCredential tokenCredential, ServiceBusClientOptions? serviceBusClientOptions = null) {
-        if (string.IsNullOrEmpty(queueNameMeOther)) { throw new ArgumentNullException(nameof(queueNameMeOther)); }
-        if (string.IsNullOrEmpty(queueNameOtherMe)) { throw new ArgumentNullException(nameof(queueNameOtherMe)); }
-        if (string.IsNullOrEmpty(serviceBusNamespace)) { throw new ArgumentNullException(nameof(serviceBusNamespace)); }
-
-        this._QueueNameMeOther = queueNameMeOther;
-        this._QueueNameOtherMe = queueNameOtherMe;
-        this._ServiceBusNamespace = serviceBusNamespace;
-        this._TokenCredential = tokenCredential;
-        this._ServiceBusClientOptions = serviceBusClientOptions;
-        this._ServiceBusConnectionString = null;
-    }
-    public Task OpenForLocalReadFromFS() {
-        // var credential = new DefaultAzureCredential();
-        // var client = new ServiceBusClient("Endpoint=sb://my-service-bus-namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=secret", credential);
-
-        if (!string.IsNullOrEmpty(this._ServiceBusNamespace)) {
-            this._Client = new ServiceBusClient(this._ServiceBusNamespace, this._TokenCredential, this._ServiceBusClientOptions);
-        } else if (!string.IsNullOrEmpty(this._ServiceBusConnectionString)) {
-            this._Client = new ServiceBusClient(this._ServiceBusConnectionString, this._ServiceBusClientOptions);
-        } else {
-            throw new Exception("No connection string or namespace provided");
-        }
-        this._SenderQueueName = this._QueueNameMeOther;
-        this._Sender = _Client.CreateSender(this._QueueNameMeOther);
-        this._ReceiverQueueName = this._QueueNameOtherMe;
-        this._Receiver = _Client.CreateReceiver(this._QueueNameOtherMe);
-        return Task.CompletedTask;
-    }
-    public Task OpenForLocalWriteToFS() {
-        if (!string.IsNullOrEmpty(this._ServiceBusNamespace)) {
-            this._Client = new ServiceBusClient(this._ServiceBusNamespace, this._TokenCredential, this._ServiceBusClientOptions);
-        } else if (!string.IsNullOrEmpty(this._ServiceBusConnectionString)) {
-            this._Client = new ServiceBusClient(this._ServiceBusConnectionString, this._ServiceBusClientOptions);
-        } else {
-            throw new Exception("No connection string or namespace provided");
-        }
-        this._SenderQueueName = this._QueueNameOtherMe;
-        this._Sender = _Client.CreateSender(this._QueueNameOtherMe);
-        this._ReceiverQueueName = this._QueueNameMeOther;
-        this._Receiver = _Client.CreateReceiver(this._QueueNameMeOther);
-        return Task.CompletedTask;
-    }
-
-    public async Task<int> Setup(ServiceBusAdministrationClient adminClient) {
-        Azure.Response<QueueProperties>? responceGetQueueMeOther = null;
-        try {
-            responceGetQueueMeOther = await adminClient.GetQueueAsync(this._QueueNameMeOther);
-        } catch {
-        }
-        if (responceGetQueueMeOther is not null) {
-            System.Console.Out.WriteLine($"Found exisiting queue {_QueueNameMeOther}");
-        } else {
-            System.Console.Out.WriteLine($"Creating the queue {_QueueNameMeOther}");
-            var responceCreateQueueAB = await adminClient.CreateQueueAsync(_QueueNameMeOther);
-            if (responceCreateQueueAB is null) {
-                System.Console.Error.WriteLine($"Failed to create queue {_QueueNameMeOther}");
-                return -1;
-            }
-            var queueMeOther = responceCreateQueueAB.Value;
-            queueMeOther.DefaultMessageTimeToLive = TimeSpan.FromHours(1);
-            await adminClient.UpdateQueueAsync(queueMeOther);
-
-        }
-        Azure.Response<QueueProperties>? responceGetQueueOtherMe = null;
-        try {
-            responceGetQueueOtherMe = await adminClient.GetQueueAsync(this._QueueNameOtherMe);
-        } catch {
-        }
-        if (responceGetQueueOtherMe is not null) {
-            System.Console.Out.WriteLine($"Found exisiting queue {_QueueNameOtherMe}");
-        } else {
-            System.Console.Out.WriteLine($"Creating the queue {_QueueNameOtherMe}");
-            var responceCreateQueueOtherMe = await adminClient.CreateQueueAsync(_QueueNameOtherMe);
-            if (responceCreateQueueOtherMe is null) {
-                System.Console.Error.WriteLine($"Failed to create queue {_QueueNameOtherMe}");
-                return -1;
-            }
-            var queueOtherMe = responceCreateQueueOtherMe.Value;
-            queueOtherMe.DefaultMessageTimeToLive = TimeSpan.FromHours(1);
-            await adminClient.UpdateQueueAsync(queueOtherMe);
-        }
-        return 0;
-    }
-
-
-    public async Task Ping() {
-        if (this._Sender is null) {
-            throw new Exception("Sender is null");
-        }
-        if (this._Receiver is null) {
-            throw new Exception("Receiver is null");
-        }
-        System.Console.Out.WriteLine($"Sending ping {_SenderQueueName}");
-        ;
-        var tick = Random.Shared.NextInt64().ToString();
-        await this._Sender.SendMessageAsync(
-            new ServiceBusMessage(tick) {
-                ContentType = "text/plain",
-                Subject = "ping"
-            }
-            );
-        while (true) {
-            System.Console.Out.WriteLine($"Wait for pong  {_ReceiverQueueName}");
-            var msg = await this._Receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
-            if (msg is not null) {
-                try {
-                    if (msg.ContentType == "text/plain" && msg.Subject == "pong") {
-                        if (msg.Body.ToString() == tick) {
-                            System.Console.Out.WriteLine($"pong received {tick}");
-                            break;
-                        } else {
-                            System.Console.Out.WriteLine($"Wrong tick {msg.Body.ToString()} != {tick}");
-                        }
-                    } else {
-                        System.Console.Out.WriteLine($"Message received {msg.ContentType} {msg.Subject} {msg.Body}");
-                    }
-                } finally {
-                    await this._Receiver.CompleteMessageAsync(msg);
-                }
-            }
-            await Task.Delay(1000);
-        }
-        await this._Sender.SendMessageAsync(
-            new ServiceBusMessage(tick) {
-                ContentType = "text/plain",
-                Subject = "pang"
-            }
-            );
-    }
-    public async Task WaitForPing() {
-        if (this._Sender is null) {
-            throw new Exception("Sender is null");
-        }
-        if (this._Receiver is null) {
-            throw new Exception("Receiver is null");
-        }
-
-        string tick = "";
-        while (true) {
-            System.Console.Out.WriteLine($"Wait for ping  {_ReceiverQueueName}");
-            var msg = await this._Receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
-            if (msg is not null) {
-                try {
-                    if (msg.ContentType == "text/plain" && msg.Subject == "ping") {
-                        tick = msg.Body.ToString();
-                        System.Console.Out.WriteLine($"Ping received {tick}");
-                        break;
-                    } else {
-                        System.Console.Out.WriteLine($"Message received {msg.ContentType} {msg.Subject} {msg.Body}");
-                    }
-                } finally {
-                    await this._Receiver.CompleteMessageAsync(msg);
-                }
-            }
-            await Task.Delay(1000);
-        }
-        System.Console.Out.WriteLine($"Sending pong {_SenderQueueName} Tick:{tick}");
-        await this._Sender.SendMessageAsync(
-            new ServiceBusMessage(tick) {
-                ContentType = "text/plain",
-                Subject = "pong"
-            }
-            );
-        while (true) {
-            System.Console.Out.WriteLine($"Wait for pang  {_ReceiverQueueName}");
-            var msg = await this._Receiver.ReceiveMessageAsync(TimeSpan.FromSeconds(10));
-            if (msg is not null) {
-                try {
-                    if (msg.ContentType == "text/plain" && msg.Subject == "pang") {
-                        tick = msg.Body.ToString();
-                        System.Console.Out.WriteLine($"Pang received {tick}");
-                        break;
-                    } else {
-                        System.Console.Out.WriteLine($"Message received {msg.ContentType} {msg.Subject} {msg.Body}");
-                    }
-                } finally {
-                    await this._Receiver.CompleteMessageAsync(msg);
-                }
-            }
-            await Task.Delay(1000);
-        }
-    }
-
-    public async Task Send(Message message) {
-        if (this._Sender is null) {
-            throw new Exception("Sender is null");
-        }
-
-        await this._Sender.SendMessageAsync(
-            new ServiceBusMessage(message.Body) {
-                ContentType = message.ContentType,
-                Subject = message.Subject
-            }
-            );
-
-    }
-    public async Task<Message?> Receive(TimeSpan? timeout = default) {
-        if (this._Receiver is null) {
-            throw new Exception("Receiver is null");
-        }
-        var receivedMessage = await this._Receiver.ReceiveMessageAsync(timeout.GetValueOrDefault(TimeSpan.FromSeconds(10)));
-        if (receivedMessage is null) {
-            return null;
-        } else {
-            var result = new Message(receivedMessage.Subject, receivedMessage.ContentType, receivedMessage.Body);
-            await this._Receiver.CompleteMessageAsync(receivedMessage);
-            return result;
-        }
-    }
-
-
-    public async ValueTask DisposeAsync() {
-        if (this._Receiver is not null) {
-            await this._Receiver.DisposeAsync();
-            this._Receiver = null;
-        }
-        if (this._Sender is not null) {
-            await this._Sender.DisposeAsync();
-            this._Sender = null;
-        }
-        if (this._Client is not null) {
-            await this._Client.DisposeAsync();
-            this._Client = null;
-        }
-    }
-
 }
