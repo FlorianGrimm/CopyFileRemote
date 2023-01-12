@@ -79,14 +79,6 @@ public class Program {
 
     private static async Task<(int result, ITransportService? transportService)> SetupPipeline(AppSettings appSettings) {
 
-        if (appSettings.ServiceType == ServiceType.Clipboard) {
-            var transportService = CreateTransportService(appSettings);
-            if (transportService is null) {
-                System.Console.Error.WriteLine($"Service type '{appSettings.ServiceType}' is not supported.");
-                return (-1, null);
-            }
-            return (0, transportService);
-        }
         if (appSettings.ServiceType == ServiceType.ServiceBusQueue) {
             System.Console.Out.WriteLine("Creating the Service Bus Administration Client object");
             var adminClient = createServiceBusAdministrationClient(appSettings);
