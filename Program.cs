@@ -7,6 +7,7 @@ public class Program {
 
     [System.STAThread()]
     public static async Task<int> Main(string[] args) {
+        args=new []{"--OutputPath", "C:\\github.com\\FlorianGrimm\\t", "--HostMe", "A", "--HostOther", "B", "--ServiceType", "ServiceBusQueue"};
         var appSettings = GetAppSettings(args);
         if (appSettings.ServiceType == ServiceType.Unknown) {
             System.Console.Error.WriteLine("ServiceType is not configured and cannot be determined.");
@@ -294,7 +295,6 @@ public class Program {
 
             var listFileHashReceiver = await taskReadListFileHash;
             var dictFileHashReceiver = listFileHashReceiver.LstFileHash.ToDictionary(x => x.RelativeName, x => x);
-            System.Diagnostics.Debugger.Break();
             System.Console.Out.WriteLine($"listFileHashReceiver:");
             foreach(var x in listFileHashReceiver.LstFileHash){
                 System.Console.Out.WriteLine($"R:{x.RelativeName}");
@@ -314,7 +314,6 @@ public class Program {
                 getFileContent.LstRelativeName.Add(fileHash.RelativeName);
             }
 
-            System.Console.ReadLine();
             await transportService.Send(new TransportMessage(nameof(GetFileContent), "application/json", System.BinaryData.FromObjectAsJson(getFileContent)));
 
             while (true) {
