@@ -1,16 +1,17 @@
 ﻿namespace CopyFileRemote;
 
 public class Program {
+    private const string SubjectGoodbye = "Goodbye";
+    private const string SubjectSubjectMoreQ = "More?";
+    private const string SubjectContinue = "Continue";
+
+    [System.STAThread()]
     public static async Task<int> Main(string[] args) {
         var appSettings = GetAppSettings(args);
         if (appSettings.ServiceType == ServiceType.Unknown) {
             System.Console.Error.WriteLine("ServiceType is not configured and cannot be determined.");
             return -1;
         }
-        // if (appSettings.HostType == HostType.Unknown) {
-        //     System.Console.Error.WriteLine("HostType is not configured and cannot be determined.");
-        //     return -1;
-        // }
         if (appSettings.ServiceType == ServiceType.ServiceBusQueue) {
             if (string.IsNullOrEmpty(appSettings.ServiceBusConnectionString)
                 && string.IsNullOrEmpty(appSettings.ServiceBusNamespace)
@@ -77,7 +78,6 @@ public class Program {
     }
 
     private static async Task<(int result, ITransportService? transportService)> SetupPipeline(AppSettings appSettings) {
-        System.Console.Out.WriteLine("Creating the Service Bus Administration Client object");
 
         if (appSettings.ServiceType == ServiceType.Clipboard) {
             var transportService = CreateTransportService(appSettings);
@@ -88,6 +88,7 @@ public class Program {
             return (0, transportService);
         }
         if (appSettings.ServiceType == ServiceType.ServiceBusQueue) {
+            System.Console.Out.WriteLine("Creating the Service Bus Administration Client object");
             var adminClient = createServiceBusAdministrationClient(appSettings);
             if (adminClient is null) {
                 System.Console.Error.WriteLine("ServiceBusNamespace or ServiceBusConnectionString is not configured.");
@@ -102,6 +103,7 @@ public class Program {
             return (0, transportService);
         }
         if (appSettings.ServiceType == ServiceType.ServiceBusTopic) {
+            System.Console.Out.WriteLine("Creating the Service Bus Administration Client object");
             var adminClient = createServiceBusAdministrationClient(appSettings);
             if (adminClient is null) {
                 System.Console.Error.WriteLine("ServiceBusNamespace or ServiceBusConnectionString is not configured.");
@@ -166,12 +168,13 @@ public class Program {
 
         await transportService.OpenForLocalReadFromFS();
         await transportService.Ping();
+
         try {
             var listFileHashSender = await taskReadListFileHash;
 
             // var json = System.Text.Json.JsonSerializer.Serialize(listFileHashSender);
 
-            await transportService.Send(new TransportMessage("ListFileHash", "application/json", System.BinaryData.FromObjectAsJson(listFileHashSender)));
+            await transportService.Send(new TransportMessage(nameof(ListFileHash), "application/json", System.BinaryData.FromObjectAsJson(listFileHashSender)));
 
             while (true) {
                 GetFileContent? getFileContent = null;
@@ -185,7 +188,7 @@ public class Program {
                         getFileContent = msg.Body.ToObjectFromJson<GetFileContent>();
                         break;
                     }
-                    if (msg.Subject == "Goodbye") {
+                    if (msg.Subject == SubjectGoodbye) {
                         return 0;
                     }
                 }
@@ -212,7 +215,7 @@ public class Program {
                     putFileContent.LstFileContent.Add(fileContent);
                     size += content.Length;
                     if (size > 10 * 1024) {
-                        await transportService.Send(new TransportMessage("PutFileContent", "application/json", System.BinaryData.FromObjectAsJson(putFileContent)));
+                        await transportService.Send(new TransportMessage(nameof(PutFileContent), "application/json", System.BinaryData.FromObjectAsJson(putFileContent)));
                         putFileContent = new(new());
                         size = 0;
                         await Task.Delay(TimeSpan.FromMilliseconds(10));
@@ -229,22 +232,22 @@ public class Program {
                                 }
                                 break;
                             }
-                            if (msg.Subject == "Goodbye") {
+                            if (msg.Subject == SubjectGoodbye) {
                                 return 0;
                             }
-                            if (msg.Subject == "Continue") {
+                            if (msg.Subject == SubjectContinue) {
                                 break;
                             }
                         }
                     }
                 }
                 if (putFileContent.LstFileContent.Count > 0) {
-                    await transportService.Send(new TransportMessage("PutFileContent", "application/json", System.BinaryData.FromObjectAsJson(putFileContent)));
+                    await transportService.Send(new TransportMessage(nameof(PutFileContent), "application/json", System.BinaryData.FromObjectAsJson(putFileContent)));
                 }
-                await transportService.Send(new TransportMessage("More?", "application/json", System.BinaryData.FromString("More?")));
+                await transportService.Send(new TransportMessage(SubjectSubjectMoreQ, "application/json", System.BinaryData.FromString(SubjectSubjectMoreQ)));
             }
         } finally {
-            await transportService.Send(new TransportMessage("Goodbye", "application/json", System.BinaryData.FromString("Goodbye")));
+            await transportService.Send(new TransportMessage(SubjectGoodbye, "application/json", System.BinaryData.FromString(SubjectGoodbye)));
             while ((await transportService.Receive(TimeSpan.FromSeconds(2))) is not null) { }
         }
     }
@@ -282,7 +285,7 @@ public class Program {
                     await Task.Delay(TimeSpan.FromMilliseconds(100 + Random.Shared.NextInt64() % 500));
                     continue;
                 }
-                if (msg.Subject == "ListFileHash") {
+                if (msg.Subject == nameof(ListFileHash)) {
                     listFileHashSender = msg.Body.ToObjectFromJson<ListFileHash>();
                     break;
                 }
@@ -304,7 +307,7 @@ public class Program {
                 }
                 getFileContent.LstRelativeName.Add(fileHash.RelativeName);
             }
-            await transportService.Send(new TransportMessage("GetFileContent", "application/json", System.BinaryData.FromObjectAsJson(getFileContent)));
+            await transportService.Send(new TransportMessage(nameof(GetFileContent), "application/json", System.BinaryData.FromObjectAsJson(getFileContent)));
 
             while (true) {
                 var msg = await transportService.Receive();
@@ -312,7 +315,7 @@ public class Program {
                     await Task.Delay(TimeSpan.FromMilliseconds(100 + Random.Shared.NextInt64() % 500));
                     continue;
                 }
-                if (msg.Subject == "PutFileContent") {
+                if (msg.Subject == nameof(PutFileContent)) {
                     var putFileContent = msg.Body.ToObjectFromJson<PutFileContent>();
                     foreach (var fileContent in putFileContent.LstFileContent) {
                         var relativeName = fileContent.RelativeName;
@@ -327,26 +330,27 @@ public class Program {
                             await System.IO.File.WriteAllBytesAsync(file.FullName, Convert.FromBase64String(fileContent.ContentBase64));
                         }
                     }
-                    await transportService.Send(new TransportMessage("Continue", "application/json", System.BinaryData.FromString("Continue")));
+                    await transportService.Send(new TransportMessage(SubjectContinue, "application/json", System.BinaryData.FromString(SubjectContinue)));
                     continue;
                 }
 
-                if (msg.Subject == "Goodbye") {
+                if (msg.Subject == SubjectGoodbye) {
                     break;
                 }
 
 
-                if (msg.Subject == "More?") {
+                if (msg.Subject == SubjectSubjectMoreQ) {
                     break;
                 }
             }
         } finally {
-            await transportService.Send(new TransportMessage("Goodbye", "application/json", System.BinaryData.FromString("Goodbye")));
+            await transportService.Send(new TransportMessage(SubjectGoodbye, "application/json", System.BinaryData.FromString(SubjectGoodbye)));
             while ((await transportService.Receive(TimeSpan.FromSeconds(2))) is not null) { }
         }
 
         return 0;
     }
+
     private static List<FileInfo>? ReadDirectory(AppSettings appSettings, string? path) {
         if (string.IsNullOrEmpty(path)) {
             System.Console.Error.WriteLine($"Path is not configured.");
@@ -435,12 +439,6 @@ public class Program {
     }
 
     private static ITransportService? CreateTransportService(AppSettings appSettings) {
-        if (appSettings.ServiceType == ServiceType.Clipboard) {
-            return new ClipboardTransportService(
-                appSettings.GetServiceBusQueueMeOther(),
-                appSettings.GetServiceBusQueueOtherMe()
-                );
-        } else
         if (appSettings.ServiceType == ServiceType.ServiceBusQueue) {
             if (!string.IsNullOrEmpty(appSettings.ServiceBusNamespace)) {
                 var tokenCredential = GetTokenCredential(appSettings);
@@ -475,32 +473,4 @@ public class Program {
     private static bool DoesExtensionMatch(FileInfo fi, HashSet<string> hsIncludeExtensions) {
         return fi.Extension.Length == 0 || hsIncludeExtensions.Contains(fi.Extension);
     }
-
-
-}
-
-public record ListFileHash(
-    List<FileHash> LstFileHash
-);
-public record FileHash(string RelativeName, string Hash);
-
-public record GetFileContent(
-    List<string> LstRelativeName
-);
-public record PutFileContent(
-    List<FileContent> LstFileContent
-);
-public record FileContent(string RelativeName, string ContentBase64);
-
-public enum HostType {
-    Unknown,
-    HostA,
-    HostB,
-}
-
-public enum ServiceType {
-    Unknown,
-    Clipboard,
-    ServiceBusQueue,
-    ServiceBusTopic,
 }
