@@ -7,7 +7,11 @@ public class AppSettings {
     public string? HostOther { get; set; }
     public string? Json { get; set; }
     public string? InputPath { get; set; }
-    public string[] IncludeExtensions { get; set; } = new[] { ".sln", ".cs", ".csproj", ".ts", ".tsx", ".txt", ".bat", ".ps1", ".md", ".sql", "*.gif", "*.png" };
+    public string[] IncludeExtensions { get; set; } = new[] {
+        ".sln", ".cs", ".csproj", ".ts", ".tsx", ".txt", ".bat", ".ps1", ".md", ".sql", "*.gif", "*.png",
+        ".editorconfig",".gitignore",".yml",".props",".json",".config",".cmd",".sh",".ipynb",".targets",
+        ".xml",".sqlproj",".xsd",".cshtml",".ico",".resx",".css",".js",".yaml",
+    };
     public string[] ExcludeDirectory { get; set; } = new[] { "node_modules", "bower_components", "obj", "bin", "packages" };
     public string? OutputPath { get; set; }
     public bool RecurseSubdirectories { get; set; } = true;
