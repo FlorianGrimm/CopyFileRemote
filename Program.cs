@@ -209,10 +209,11 @@ public class Program {
 
                     // System.Console.Out.WriteLine(relativeName);
                     //var content = await System.IO.File.ReadAllBytesAsync(inputPath + relativeName);
-                    using var fs = File.OpenRead(inputPath + relativeName);
-                    using var brotliStream=new BrotliStream(fs, System.IO.Compression.CompressionLevel.SmallestSize);
+                    //using var msSource = new MemoryStream(content);
+                    using var fs=File.OpenRead(inputPath + relativeName);
                     using var msDest = new System.IO.MemoryStream();
-                    await brotliStream.CopyToAsync(msDest);
+                    using var brotliStream=new BrotliStream(msDest, System.IO.Compression.CompressionLevel.SmallestSize, false);
+                    await fs.CopyToAsync(brotliStream);
                     msDest.Position = 0;
                     var contentCompressed = msDest.ToArray();
                     var fileContent = new FileContent(relativeName, Convert.ToBase64String(contentCompressed));
