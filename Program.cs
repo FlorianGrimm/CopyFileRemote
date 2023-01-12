@@ -7,7 +7,7 @@ public class Program {
 
     [System.STAThread()]
     public static async Task<int> Main(string[] args) {
-        args=new []{"--OutputPath", "C:\\github.com\\FlorianGrimm\\t", "--HostMe", "A", "--HostOther", "B", "--ServiceType", "ServiceBusQueue"};
+        // args=new []{"--OutputPath", "C:\\github.com\\FlorianGrimm\\t", "--HostMe", "A", "--HostOther", "B", "--ServiceType", "ServiceBusQueue"};
         var appSettings = GetAppSettings(args);
         if (appSettings.ServiceType == ServiceType.Unknown) {
             System.Console.Error.WriteLine("ServiceType is not configured and cannot be determined.");
@@ -206,10 +206,16 @@ public class Program {
                         System.Console.Out.WriteLine($"Skip {relativeName}");
                         continue;
                     }
-                    System.Console.Out.WriteLine(relativeName);
-                    var content = await System.IO.File.ReadAllBytesAsync(inputPath + relativeName);
-                    
-                    var fileContent = new FileContent(relativeName, Convert.ToBase64String(content));
+
+                    // System.Console.Out.WriteLine(relativeName);
+                    //var content = await System.IO.File.ReadAllBytesAsync(inputPath + relativeName);
+                    using var fs = File.OpenRead(inputPath + relativeName);
+                    using var brotliStream=new BrotliStream(fs, System.IO.Compression.CompressionLevel.SmallestSize);
+                    using var msDest = new System.IO.MemoryStream();
+                    await brotliStream.CopyToAsync(msDest);
+                    msDest.Position = 0;
+                    var contentCompressed = msDest.ToArray();
+                    var fileContent = new FileContent(relativeName, Convert.ToBase64String(contentCompressed));
                     size += fileContent.ContentBase64.Length + relativeName.Length +256;
                     if (size>262144){
                         if (putFileContent.LstFileContent.Count==0){
@@ -304,10 +310,11 @@ public class Program {
 
             var listFileHashReceiver = await taskReadListFileHash;
             var dictFileHashReceiver = listFileHashReceiver.LstFileHash.ToDictionary(x => x.RelativeName, x => x);
-            System.Console.Out.WriteLine($"listFileHashReceiver:");
-            foreach(var x in listFileHashReceiver.LstFileHash){
-                System.Console.Out.WriteLine($"R:{x.RelativeName}");
-            }
+            
+            //System.Console.Out.WriteLine($"listFileHashReceiver:");
+            //foreach(var x in listFileHashReceiver.LstFileHash){
+            //    System.Console.Out.WriteLine($"R:{x.RelativeName}");
+            //}
 
             var getFileContent = new GetFileContent(new());
             foreach (var fileHash in listFileHashSender.LstFileHash) {
@@ -343,7 +350,11 @@ public class Program {
                         if (string.IsNullOrEmpty(fileContent.ContentBase64)) {
                             System.IO.File.WriteAllText(file.FullName, "");
                         } else {
-                            await System.IO.File.WriteAllBytesAsync(file.FullName, Convert.FromBase64String(fileContent.ContentBase64));
+                            var contentCompressed = Convert.FromBase64String(fileContent.ContentBase64);
+                            using var msSource = new MemoryStream(contentCompressed);
+                            using var brotliStream = new BrotliStream(msSource, CompressionMode.Decompress);
+                            using var fs = File.OpenWrite(file.FullName);
+                            await brotliStream.CopyToAsync(fs);
                         }
                     }
                     await transportService.Send(new TransportMessage(SubjectContinue, "application/json", System.BinaryData.FromString(SubjectContinue)));
