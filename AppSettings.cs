@@ -40,6 +40,18 @@ public class AppSettings {
     }
 }
 
+public enum HostType {
+    Unknown,
+    HostA,
+    HostB,
+}
+
+public enum ServiceType {
+    Unknown,
+    ServiceBusQueue,
+    ServiceBusTopic,
+}
+
 
 public class ClientSecretOptions {
     /// <summary>
