@@ -139,6 +139,7 @@ public class Program {
 
     private static async Task<int> LocalReadFromFS(AppSettings appSettings, ITransportService transportService) {
         var inputPath = appSettings.InputPath;
+        inputPath = System.IO.Path.GetFullPath(inputPath);
         if (string.IsNullOrEmpty(inputPath)) {
             return -1;
         }
@@ -167,7 +168,9 @@ public class Program {
             // var json = System.Text.Json.JsonSerializer.Serialize(listFileHashSender);
 
             await transportService.Send(new TransportMessage(nameof(ListFileHash), "application/json", System.BinaryData.FromObjectAsJson(listFileHashSender)));
-
+            foreach (var r in listFileHashSender.LstFileHash) {
+                System.Console.WriteLine($"S:{r.RelativeName} - {r.Hash}");
+            }
             while (true) {
                 GetFileContent? getFileContent = null;
                 while (true) {
@@ -199,6 +202,7 @@ public class Program {
 
                 while (queueRelativeName.TryDequeue(out var relativeName)) {
                     if (!hsRelativeNameSender.Contains(relativeName)) {
+                        System.Console.Out.WriteLine($"Skip {relativeName}");
                         continue;
                     }
                     System.Console.Out.WriteLine(relativeName);
