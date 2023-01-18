@@ -6,7 +6,7 @@ using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.UI;
 using MicrosoftGraph = Microsoft.Graph;
 
-namespace CopyFileRemoteWebApp;
+namespace CopyFileRemote.WebApp;
 
 public class Program
 {
@@ -30,6 +30,8 @@ public class Program
         });
         builder.Services.AddRazorPages()
             .AddMicrosoftIdentityUI();
+        builder.Services.AddSignalR();
+        builder.Services.AddHostedService<CopyFileRemoteWorkerService>();
 
         var app = builder.Build();
 
@@ -49,6 +51,7 @@ public class Program
         app.UseAuthorization();
 
         app.MapRazorPages();
+        app.MapHub<CopyFileRemoteHub>("/CopyFileRemoteWS");
         app.MapControllers();
 
         app.Run();

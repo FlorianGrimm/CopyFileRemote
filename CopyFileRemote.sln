@@ -5,7 +5,11 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CopyFileRemote", "CopyFileRemote\CopyFileRemote.csproj", "{1F5C2508-84B0-4695-ACCB-40ABFBD5979F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CopyFileRemoteWebApp", "CopyFileRemoteWebApp\CopyFileRemoteWebApp.csproj", "{987F8257-D640-443F-AFEA-2CA227AC1324}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CopyFileRemoteContracts", "CopyFileRemoteContracts\CopyFileRemoteContracts.csproj", "{47428F3B-6D52-4194-A2DF-BAAB47DB18B2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CopyFileRemoteWebApp", "CopyFileRemoteWebApp\CopyFileRemoteWebApp.csproj", "{BD9D89B8-85F2-442B-82F8-07E2DEB266BA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CopyFileRemoteClient", "CopyFileRemoteClient\CopyFileRemoteClient.csproj", "{4E0018B9-F2FA-4EF8-8C10-15C713712C4F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -20,9 +24,17 @@ Global
 		{1F5C2508-84B0-4695-ACCB-40ABFBD5979F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1F5C2508-84B0-4695-ACCB-40ABFBD5979F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1F5C2508-84B0-4695-ACCB-40ABFBD5979F}.Release|Any CPU.Build.0 = Release|Any CPU
-		{987F8257-D640-443F-AFEA-2CA227AC1324}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{987F8257-D640-443F-AFEA-2CA227AC1324}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{987F8257-D640-443F-AFEA-2CA227AC1324}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{987F8257-D640-443F-AFEA-2CA227AC1324}.Release|Any CPU.Build.0 = Release|Any CPU
+		{47428F3B-6D52-4194-A2DF-BAAB47DB18B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{47428F3B-6D52-4194-A2DF-BAAB47DB18B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{47428F3B-6D52-4194-A2DF-BAAB47DB18B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{47428F3B-6D52-4194-A2DF-BAAB47DB18B2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BD9D89B8-85F2-442B-82F8-07E2DEB266BA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BD9D89B8-85F2-442B-82F8-07E2DEB266BA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BD9D89B8-85F2-442B-82F8-07E2DEB266BA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BD9D89B8-85F2-442B-82F8-07E2DEB266BA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4E0018B9-F2FA-4EF8-8C10-15C713712C4F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E0018B9-F2FA-4EF8-8C10-15C713712C4F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E0018B9-F2FA-4EF8-8C10-15C713712C4F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E0018B9-F2FA-4EF8-8C10-15C713712C4F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

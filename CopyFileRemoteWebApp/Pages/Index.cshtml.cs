@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Graph;
 using Microsoft.Identity.Web;
 
-namespace CopyFileRemoteWebApp.Pages;
+namespace CopyFileRemote.WebApp.Pages;
 
 [AuthorizeForScopes(ScopeKeySection = "DownstreamApi:Scopes")]
 public class IndexModel : PageModel
